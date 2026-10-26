@@ -81,6 +81,47 @@ def calendar_date_chunks(start, days, max_span=CALENDAR_MAX_SPAN_DAYS):
     return chunks
 
 
+def mu_opgave_content(opgave):
+    """Return supported text content as HTML, or an empty string."""
+    content = opgave.get("indhold")
+    if not content or opgave.get("indholdsType", "text") != "text":
+        return ""
+    if isinstance(content, str):
+        try:
+            content = json.loads(content)
+        except json.JSONDecodeError:
+            _LOGGER.warning("Could not decode Min Uddannelse assignment content as JSON")
+            return ""
+    if not isinstance(content, dict) or not isinstance(content.get("text"), str):
+        _LOGGER.warning("Unexpected Min Uddannelse assignment content format")
+        return ""
+    return content["text"] if content["text"].strip() else ""
+
+
+def mu_opgaver_data(opgaver, child_name):
+    """Return automation-friendly assignments for one child's full name."""
+    result = []
+    for opgave in opgaver:
+        if opgave.get("kuvertnavn", "").split() != child_name.split():
+            continue
+        content = mu_opgave_content(opgave)
+        soup = BeautifulSoup(content, "html.parser")
+        for tag in soup(["script", "style"]):
+            tag.decompose()
+        result.append({
+            "id": opgave.get("id"),
+            "titel": opgave["title"],
+            "dato": opgave.get("afleveringsdato"),
+            "ugedag": opgave.get("ugedag"),
+            "fag": [
+                hold.get("fagNavn") or hold.get("navn", "")
+                for hold in opgave.get("hold", [])
+            ],
+            "indhold": soup.get_text(" ", strip=True),
+        })
+    return result
+
+
 def format_mu_opgaver(opgaver, first_name):
     """Render one child's opgaver as the HTML used for the sensor attribute."""
     _ugep = ""
@@ -101,23 +142,9 @@ def format_mu_opgaver(opgaver, first_name):
             _ugep = _ugep + "Forløb: " + opgave["forloeb"]["navn"]
         except (KeyError, TypeError):
             _LOGGER.debug("Did not find forloeb key: " + str(opgave))
-        content = opgave.get("indhold")
-        if content and opgave.get("indholdsType", "text") == "text":
-            if isinstance(content, str):
-                try:
-                    content = json.loads(content)
-                except json.JSONDecodeError:
-                    _LOGGER.warning(
-                        "Could not decode Min Uddannelse assignment content as JSON"
-                    )
-                    continue
-            if not isinstance(content, dict) or not isinstance(content.get("text"), str):
-                _LOGGER.warning(
-                    "Unexpected Min Uddannelse assignment content format"
-                )
-                continue
-            if content["text"].strip():
-                _ugep = _ugep + "<br>" + content["text"] + "<br>"
+        content = mu_opgave_content(opgave)
+        if content:
+            _ugep = _ugep + "<br>" + content + "<br>"
     return _ugep
 
 
@@ -236,6 +263,8 @@ class Client:
         self.unread_messages = unread_messages
         self.easyiq_login_ids = {}
         self._mu_session = requests.Session()
+        self.mu_opgaver_data_attr = {}
+        self.mu_opgaver_next_data_attr = {}
 
     def _get_mu_web_opgaver(self, pupil_id, week):
         """Read descriptions using the separate Min Uddannelse web session."""
@@ -1295,8 +1324,14 @@ class Client:
                         _ugep = format_mu_opgaver(opgaver_list, first_name)
                         if thisnext == "this":
                             self.mu_opgaver_attr[first_name] = _ugep
+                            self.mu_opgaver_data_attr[str(full_name[0])] = mu_opgaver_data(
+                                opgaver_list, full_name[1]
+                            )
                         elif thisnext == "next":
                             self.mu_opgaver_next_attr[first_name] = _ugep
+                            self.mu_opgaver_next_data_attr[str(full_name[0])] = mu_opgaver_data(
+                                opgaver_list, full_name[1]
+                            )
                         _LOGGER.debug("MU Opgaver result: " + str(_ugep))
 
             now = datetime.datetime.now() + datetime.timedelta(weeks=1)
