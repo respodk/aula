@@ -1,0 +1,64 @@
+alias: Skole - Opgaver til i morgen
+description: Sender opgaver med indhold til næste dag kl. 16
+triggers:
+  - trigger: time
+    at: '16:00:00'
+    weekday:
+      - mon
+      - tue
+      - wed
+      - thu
+      - fri
+conditions: []
+actions:
+  - variables:
+      opgaver: '{{ state_attr(''sensor.lynge_skole_your_name'', ''mu_opgaver_data'') or [] }}'
+      besked: >-
+        {% set ns = namespace(tekst='', antal=0) %} {% set i_morgen = (now() +
+        timedelta(days=1)).date() %} {% for opgave in opgaver %}
+          {% if opgave.indhold is defined
+                and opgave.indhold is string
+                and opgave.indhold | trim != ''
+                and opgave.dato is defined %}
+            {% set ts = opgave.dato | regex_findall_index('Date\\((\\d+)', 0, '') %}
+            {% if ts != '' %}
+              {% set dato = as_datetime((ts | int / 1000) | int) | as_local %}
+              {% if dato.date() == i_morgen %}
+                {% set ns.antal = ns.antal + 1 %}
+                {% set ns.tekst = ns.tekst
+                  ~ opgave.ugedag ~ ' – '
+                  ~ (opgave.fag | join(', ')) ~ '\n'
+                  ~ (opgave.indhold | trim) ~ '\n\n' %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %} {{ ns.tekst | trim }}
+      antal_opgaver: >-
+        {% set ns = namespace(antal=0) %} {% set i_morgen = (now() +
+        timedelta(days=1)).date() %} {% for opgave in opgaver %}
+          {% if opgave.indhold is defined
+                and opgave.indhold is string
+                and opgave.indhold | trim != ''
+                and opgave.dato is defined %}
+            {% set ts = opgave.dato | regex_findall_index('Date\\((\\d+)', 0, '') %}
+            {% if ts != '' %}
+              {% set dato = as_datetime((ts | int / 1000) | int) | as_local %}
+              {% if dato.date() == i_morgen %}
+                {% set ns.antal = ns.antal + 1 %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %} {{ ns.antal }}
+  - if:
+      - condition: template
+        value_template: '{{ antal_opgaver | int > 0 }}'
+    then:
+      - action: notify.mobile_app_your_mobile
+        data:
+          title: AULA – Opgaver til i morgen
+          message: '{{ besked }}'
+      - action: notify.mobile_app_your_mobile
+        data:
+          title: AULA - Opgaver til imorgen
+          message: '{{ besked }}'
+mode: single
