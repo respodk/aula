@@ -1,0 +1,103 @@
+alias: Skole - Ugeplan og opgaver næste uge
+description: Sender næste uges opgaver fordelt på dage samt ugeplan lørdag kl. 12
+triggers:
+  - trigger: time
+    at: '12:00:00'
+    weekday:
+      - sat
+conditions: []
+actions:
+  - variables:
+      opgaver: >-
+        {{ state_attr('sensor.lynge_skole_your_name', 'mu_opgaver_next_data') or
+        [] }}
+      ugeplan: '{{ state_attr(''sensor.lynge_skole_sensor.lynge_skole_your_name'', ''ugeplan_next'') or '''' }}'
+  - repeat:
+      for_each:
+        - Mandag
+        - Tirsdag
+        - Onsdag
+        - Torsdag
+        - Fredag
+        - Lørdag
+        - Søndag
+      sequence:
+        - variables:
+            dagsopgaver: |-
+              {% set ns = namespace(tekst='') %} {% for opgave in opgaver %}
+                {% if opgave.ugedag | default('') | trim | lower == repeat.item | lower
+                      and opgave.indhold is defined
+                      and opgave.indhold is string
+                      and opgave.indhold | trim != '' %}
+                  {% set ns.tekst = ns.tekst
+                    ~ opgave.ugedag ~ ' – '
+                    ~ (opgave.fag | default([]) | join(', ')) ~ '\n'
+                    ~ opgave.titel ~ '\n'
+                    ~ (opgave.indhold | trim) ~ '\n\n' %}
+                {% endif %}
+              {% endfor %} {{ ns.tekst | trim }}
+        - if:
+            - condition: template
+              value_template: '{{ dagsopgaver | trim != '''' }}'
+          then:
+            - action: notify.mobile_app_your_mobile
+              data:
+                title: AULA – {{ repeat.item }}
+                message: '{{ dagsopgaver }}'
+                data:
+                  url: /dashboard-dashboard/0
+            - action: nnotify.mobile_app_your_mobile
+              data:
+                message: '{{ dagsopgaver }}'
+                title: AULA – {{ repeat.item }}
+  - if:
+      - condition: template
+        value_template: |-
+          {{ ugeplan is string and
+             ugeplan | trim not in ['', 'Not available', 'None'] }}
+    then:
+      - action: notify.mobile_app_your_mobile
+        data:
+          title: AULA - Opgaver Næste Uge
+          message: |-
+            {{ ugeplan
+               | replace('<br>', '\n')
+               | replace('<br/>', '\n')
+               | replace('<br />', '\n')
+               | replace('</p>', '\n\n')
+               | replace('</h2>', '\n')
+               | replace('</h3>', '\n')
+               | striptags
+               | replace('&nbsp;', ' ')
+               | replace('&amp;', '&')
+               | replace('&aelig;', 'æ')
+               | replace('&oslash;', 'ø')
+               | replace('&aring;', 'å')
+               | replace('&AElig;', 'Æ')
+               | replace('&Oslash;', 'Ø')
+               | replace('&Aring;', 'Å')
+               | trim }}
+          data:
+            url: /dashboard-dashboard/0
+      - action: notify.mobile_app_your_mobile
+        data:
+          message: |-
+            {{ ugeplan
+               | replace('<br>', '\n')
+               | replace('<br/>', '\n')
+               | replace('<br />', '\n')
+               | replace('</p>', '\n\n')
+               | replace('</h2>', '\n')
+               | replace('</h3>', '\n')
+               | striptags
+               | replace('&nbsp;', ' ')
+               | replace('&amp;', '&')
+               | replace('&aelig;', 'æ')
+               | replace('&oslash;', 'ø')
+               | replace('&aring;', 'å')
+               | replace('&AElig;', 'Æ')
+               | replace('&Oslash;', 'Ø')
+               | replace('&Aring;', 'Å')
+               | trim }}
+          title: AULA - Opgaver Næste Uge
+mode: single
