@@ -1,0 +1,87 @@
+views:
+  - title: Your title
+    type: sections
+    max_columns: 4
+    theme: ios-dark-mode
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Nyt afsnit
+          - type: vertical-stack
+            cards:
+              - type: entities
+                title: Your title
+                icon: mdi:school
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.lynge_skole_your_name_sensor
+                    name: Skolestatus / Tilstedeværelse
+                    icon: mdi:account-school
+                  - entity: calendar.fodselsdage_your_name_sensor
+                    name: Næste fødselsdag
+                    icon: mdi:cake-variant
+              - type: calendar
+                title: Kommende uge & skema
+                initial_view: listWeek
+                entities:
+                  - calendar.skoleskema_your_name_sensor
+                  - calendar.ugeplan_your_name_sensor
+      - type: grid
+        cards:
+          - type: heading
+            heading: Nyt afsnit
+          - type: entities
+            title: Your title
+            icon: mdi:school
+            show_header_toggle: false
+            entities:
+              - entity: sensor.lynge_skole_your_name_sensor
+                name: Skolestatus / Tilstedeværelse
+                icon: mdi:account-school
+              - type: section
+                label: Kalendermoduler
+              - entity: calendar.skoleskema_your_name_sensor
+                name: Skoleskema
+                icon: mdi:timetable
+              - entity: calendar.ugeplan_your_name_sensor
+                name: Ugeplan
+                icon: mdi:calendar-week
+              - entity: calendar.fodselsdage_your_name_sensor
+                name: Fødselsdage
+                icon: mdi:cake-variant
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                title: 📚 Ugenoter
+                content: |
+                  {{ state_attr('sensor.sensor.lynge_skole_your_name_sensor', 'ugeplan') }}
+              - type: markdown
+                title: 📝 Opgaver denne uge
+                content: >
+                  {% set opgaver = state_attr('sensor.sensor.lynge_skole_your_name_sensor',
+                  'mu_opgaver') %}
+
+                  {% if opgaver and opgaver != 'Not available' %}
+                    {{ opgaver }}
+                  {% else %}
+                    Ingen opgaver fundet.
+                  {% endif %}
+              - type: markdown
+                title: 📅 Opgaver næste uge
+                content: >
+                  {% set opgaver = state_attr('sensor.sensor.lynge_skole_your_name_sensorr',
+                  'mu_opgaver_next') %}
+
+                  {% if opgaver and opgaver != 'Not available' %}
+                    {{ opgaver }}
+                  {% else %}
+                    Ingen opgaver fundet.
+                  {% endif %}
+    cards: []
+    background:
+      opacity: 90
+      alignment: center
+      size: cover
+      repeat: repeat
+      attachment: scroll
